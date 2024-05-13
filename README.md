@@ -1,6 +1,5 @@
 # Github-Project
 Github Project Repository.
-GitHub Project
 --------------------
 Description:
 GitData is a command-line application designed to provide basic version control and social interaction functionalities similar to GitHub. It allows users to manage repositories, files, and user interactions in a GitHub-like environment directly from the terminal.
