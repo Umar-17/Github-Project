@@ -1,0 +1,848 @@
+//Final Code
+
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <sstream>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <Windows.h>
+using namespace std;
+namespace fs = std::filesystem; 
+
+
+void SetColorAndBackground(int ForgC, int BackC)
+{
+    WORD wColor = ((BackC & 0x0F) << 4) + (ForgC & 0x0F);
+    ;
+    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), wColor);
+    return;
+}
+
+//SetColorAndBackground(10, 0);
+//cout << "Hello World";
+//SetColorAndBackground(15, 0);
+
+
+const string usersFile = "user_credentials.csv";
+const string numFollowingFile = "num_following.csv";
+const string followedUsersFile = "followed_users.csv";
+const int MAX_USERS = 100; 
+
+
+struct File {
+    string name;
+    File* next;
+
+
+    File(const string& fileName) : name(fileName), next(nullptr) {}
+};
+
+
+struct Repository {
+    string name;
+    File* files; 
+
+    
+    Repository(const string& repoName) : name(repoName), files(nullptr) {}
+
+    
+    ~Repository() {
+        File* current = files;
+        while (current != nullptr) {
+            File* next = current->next;
+            delete current;
+            current = next;
+        }
+    }
+
+    // add a file to repo
+    void addFile(const string& fileName) {
+        File* newFile = new File(fileName);
+        newFile->next = files;
+        files = newFile;
+    }
+
+    // del a file from repo
+    void deleteFile(const string& fileName) {
+        if (files == nullptr) {
+            return;
+        }
+        if (files->name == fileName) {
+            File* temp = files;
+            files = files->next;
+            delete temp;
+            return;
+        }
+        File* current = files;
+        while (current->next != nullptr && current->next->name != fileName) {
+            current = current->next;
+        }
+        if (current->next != nullptr) {
+            File* temp = current->next;
+            current->next = current->next->next;
+            delete temp;
+        }
+    }
+
+    //display all files in repo
+    void displayFiles() const {
+        File* current = files;
+        while (current != nullptr) {
+            cout << current->name << endl;
+            current = current->next;
+        }
+    }
+};
+
+
+struct Profile {
+    string username;
+    Repository* repositories[MAX_USERS]; 
+    int numRepositories; 
+
+    Profile() : username(""), numRepositories(0) {
+        for (int i = 0; i < MAX_USERS; ++i) {
+            repositories[i] = nullptr;
+        }
+    }
+
+    
+    Profile(const string& uname) : username(uname), numRepositories(0) {
+        for (int i = 0; i < MAX_USERS; ++i) {
+            repositories[i] = nullptr;
+        }
+    }
+
+    // add a repo to profile
+    void addRepository(const string& repoName) {
+        if (numRepositories < MAX_USERS) {
+            repositories[numRepositories++] = new Repository(repoName);
+        }
+        else {
+            cout << "Maximum number of repositories reached!" << endl;
+        }
+    }
+
+
+    // delete a repo from profile
+    void deleteRepository(const string& repoName) {
+        for (int i = 0; i < numRepositories; ++i) {
+            if (repositories[i] && repositories[i]->name == repoName) {
+                delete repositories[i];
+                repositories[i] = nullptr;
+                break;
+            }
+        }
+    }
+
+    // display profile
+    void displayProfile() {
+        cout << "Username: " << username << endl;
+
+      
+        ifstream numFollowingStream(numFollowingFile);
+        if (numFollowingStream.is_open()) {
+            int numFollowing = 0;
+            string line;
+            while (getline(numFollowingStream, line)) {
+                stringstream ss(line);
+                string follower, following;
+                getline(ss, follower, ',');
+                getline(ss, following, ',');
+                if (follower == username) {
+                    numFollowing++;
+                }
+            }
+            numFollowingStream.close();
+            cout << "\nNumber of users you are following: " << numFollowing << endl;
+        }
+        else {
+            cerr << "Error: Unable to open num_following file!" << endl;
+        }
+
+       
+        ifstream followedUsersStream(followedUsersFile);
+        if (followedUsersStream.is_open()) {
+            cout << "\nUsers you are following:" << endl;
+            string line;
+            while (getline(followedUsersStream, line)) {
+                stringstream ss(line);
+                string follower, following;
+                getline(ss, follower, ',');
+                getline(ss, following, ',');
+                if (follower == username) {
+                    cout << following << endl;
+                }
+            }
+            followedUsersStream.close();
+        }
+        else {
+            cerr << "Error: Unable to open followed_users file!" << endl;
+        }
+
+        cout << "\nRepositories:" << endl;
+        for (int i = 0; i < numRepositories; ++i) {
+            if (repositories[i]) {
+                cout << "Repository: " << repositories[i]->name << endl;
+                /*cout << "Files in this repo:" << endl;
+                repositories[i]->displayFiles();*/
+                cout << "\n---------------------" << endl;
+            }
+        }
+    }
+};
+
+struct FollowedUsers {
+    string username;
+    string followed[MAX_USERS]; 
+    int numFollowed; 
+
+    FollowedUsers() : username(""), numFollowed(0) {
+        for (int i = 0; i < MAX_USERS; ++i) {
+            followed[i] = "";
+        }
+    }
+
+    FollowedUsers(const string& uname) : username(uname), numFollowed(0) {
+        for (int i = 0; i < MAX_USERS; ++i) {
+            followed[i] = "";
+        }
+    }
+
+    //add a followed user
+    void addFollowedUser(const string& followedUser) {
+        if (numFollowed < MAX_USERS) {
+            followed[numFollowed++] = followedUser;
+        }
+        else {
+            cout << "Maximum number of followed users reached!" << endl;
+        }
+    }
+};
+
+
+// create a new folder (repo) for a user
+void CreateRepositoryFolder(const string& username, const string& repositoryName) {
+    string folderName = username + "_repo/" + repositoryName;
+    fs::create_directories(folderName);  
+
+}
+
+//retrieve the user's profile
+Profile getUserProfile(const string& username) {
+    Profile userProfile(username);
+    string folderName = username + "_repo";
+    for (const auto& entry : fs::directory_iterator(folderName)) {
+        if (entry.is_directory()) {
+            userProfile.addRepository(entry.path().filename().string()); 
+        }
+    }
+    return userProfile;
+}
+
+//display the user profile
+void viewProfile(const string& username) {
+    Profile userProfile = getUserProfile(username);
+    userProfile.displayProfile();
+}
+
+//display all repo of user with files
+void DisplayRepositories(const string& username) {
+    string folderName = username + "_repo";
+    for (const auto& entry : fs::directory_iterator(folderName)) {
+        if (entry.is_directory()) {
+            cout << "Repository: " << entry.path().filename() << endl;
+            cout << "Files in this repo:" << endl;
+            string repoPath = entry.path().string();
+            for (const auto& file : fs::directory_iterator(repoPath)) {
+                if (file.is_regular_file()) {
+                    cout << file.path().filename() << endl;
+                }
+            }
+            cout << "---------------------" << endl;
+        }
+    }
+}
+
+//delete a file from a repo
+void DeleteFileFromRepository(const string& username, const string& repositoryName, const string& fileName) {
+    string folderName = username + "_repo/" + repositoryName;
+    fs::remove(folderName + "/" + fileName);  
+}
+
+//add a new file to a repo
+void AddNewFile(const string& username, const string& repositoryName) {
+    string folderName = username + "_repo/" + repositoryName;
+    string newFileName;
+    cout << "Enter the name of the new file: ";
+    cin >> newFileName;
+    ofstream newFile(folderName + "/" + newFileName + ".txt");
+    if (newFile.is_open()) {
+        newFile.close();
+        cout << "File '" << newFileName << "' created successfully!" << endl;
+    }
+    else {
+        cerr << "Error: Unable to create file!" << endl;
+    }
+}
+
+//committing changes
+void CommitChanges(const string& username, const string& repositoryName) {
+    string folderName = username + "_repo/" + repositoryName;
+    string fileName;
+    cout << "Enter the name of the file to commit changes: ";
+    cin >> fileName;
+    ofstream fileToCommit(folderName + "/" + fileName + ".txt", ios::app);  
+    if (fileToCommit.is_open()) {
+        string commitMessage;
+        SetColorAndBackground(11, 0);
+
+        cout << "Enter commit message: ";
+        cin.ignore(); 
+        getline(cin, commitMessage);
+        SetColorAndBackground(11, 0);
+
+        fileToCommit << "Commit: " << commitMessage << endl;
+        fileToCommit.close();
+
+        SetColorAndBackground(10, 0);
+
+        cout << "Commit successful!" << endl;
+        SetColorAndBackground(10, 0);
+
+    }
+    else {
+        SetColorAndBackground(12, 0);
+
+        cerr << "Error: Unable to open file for commit!" << endl;
+        SetColorAndBackground(12, 0);
+
+    }
+}
+
+//delete a repo folder
+void DeleteRepository(const string& username, const string& repositoryName) {
+    string folderName = username + "_repo/" + repositoryName;
+    fs::remove_all(folderName);  
+}
+
+
+
+
+// array to store user acc with linear prob
+Profile userAccounts[MAX_USERS];
+
+//hash func
+int hashFunction(const string& key) {
+    int hashValue = 0;
+    for (char c : key) {
+        hashValue += c; 
+    }
+    return hashValue % MAX_USERS; 
+}
+
+
+
+//register a new user
+void RegisterUser() {
+    string user_name, password;
+    SetColorAndBackground(9, 0);
+
+    cout << "\n\n/////// Register User ////////" << endl<<endl;
+    SetColorAndBackground(9, 0);
+
+    SetColorAndBackground(7, 0);
+
+    cout << "Enter User Name for Account: ";
+    cin >> user_name;
+    cout << "Enter Password for Account: ";
+    cin >> password;
+
+    ofstream file(usersFile, ios::app);
+    if (file.is_open()) {
+        file << user_name << "," << password << ",," << endl;
+        file.close();
+        SetColorAndBackground(10, 0);
+
+        cout << "Username registered successfully! " << endl;
+        SetColorAndBackground(10, 0);
+
+        fs::create_directory(user_name + "_repo");
+    }
+    else {
+        SetColorAndBackground(12, 0);
+
+        cerr << "Error: Unable to open file for writing!" << endl;
+        SetColorAndBackground(12, 0);
+
+    }
+}
+
+//verify user credentials
+bool VerifyCredentials(const string& user_name, const string& password) {
+    ifstream file(usersFile);
+    if (file.is_open()) {
+        string line;
+        while (getline(file, line)) {
+            stringstream ss(line);
+            string stored_user_name, stored_password;
+            getline(ss, stored_user_name, ',');
+            getline(ss, stored_password, ',');
+            if (stored_user_name == user_name && stored_password == password) {
+                file.close();
+                return true;
+            }
+        }
+        file.close();
+    }
+    return false;
+}
+
+//follow a user
+void FollowUser(const string& follower) {
+    string userToFollow;
+    bool userFound = false;
+    bool alreadyFollowing = false;
+
+    cout << "Enter the username of the user you want to follow: ";
+    cin >> userToFollow;
+
+    // Check if user exists in the user credentials file
+    ifstream userFile(usersFile);
+    if (userFile.is_open()) {
+        string line;
+        while (getline(userFile, line)) {
+            stringstream ss(line);
+            string username;
+            getline(ss, username, ',');
+            if (username == userToFollow) {
+                userFound = true;
+                break;
+            }
+        }
+        userFile.close();
+    }
+    else {
+        SetColorAndBackground(12, 0);
+
+        cerr << "Error: Unable to open user credentials file!" << endl;
+        SetColorAndBackground(12, 0);
+
+        return;
+    }
+
+    if (!userFound) {
+        SetColorAndBackground(12, 0);
+
+        cout << "User '" << userToFollow << "' is unavailable. You can't follow them." << endl;
+        SetColorAndBackground(12, 0);
+
+        return;
+    }
+
+    
+    if (userToFollow == follower) {
+        SetColorAndBackground(12, 0);
+
+        cout << "You can't follow yourself." << endl;
+        SetColorAndBackground(12, 0);
+
+        return;
+    }
+
+    
+    ifstream followedUsersStream(followedUsersFile);
+    if (followedUsersStream.is_open()) {
+        string line;
+        while (getline(followedUsersStream, line)) {
+            stringstream ss(line);
+            string followerName, followingName;
+            getline(ss, followerName, ',');
+            getline(ss, followingName, ',');
+            if (followerName == follower && followingName == userToFollow) {
+                alreadyFollowing = true;
+                break;
+            }
+        }
+        followedUsersStream.close();
+    }
+    else {
+        SetColorAndBackground(12, 0);
+
+        cerr << "Error: Unable to open followed_users file!" << endl;
+        SetColorAndBackground(12, 0);
+
+        return;
+    }
+
+    if (alreadyFollowing) {
+        SetColorAndBackground(12, 0);
+
+        cout << "You are already following user '" << userToFollow << "'." << endl;
+        SetColorAndBackground(12, 0);
+
+        return;
+    }
+
+    ofstream numFollowing(numFollowingFile, ios::app);
+    if (numFollowing.is_open()) {
+        numFollowing << follower << "," << userToFollow << endl;
+        numFollowing.close();
+    }
+    else {
+        SetColorAndBackground(12, 0);
+
+        cerr << "Error: Unable to open num_following file!" << endl;
+        SetColorAndBackground(12, 0);
+
+        return;
+    }
+
+    ofstream followedUsers(followedUsersFile, ios::app);
+    if (followedUsers.is_open()) {
+        followedUsers << follower << "," << userToFollow << endl;
+        followedUsers.close();
+        cout << "You are now following user: " << userToFollow << endl;
+    }
+    else {
+        SetColorAndBackground(12, 0);
+
+        cerr << "Error: Unable to open followed_users file!" << endl;
+        SetColorAndBackground(12, 0);
+
+        return;
+    }
+}
+
+// display users available to follow
+void DisplayUsersToFollow(const string& current_user) {
+    ifstream userFile(usersFile);
+    if (userFile.is_open()) {
+
+        cout << "Users available to follow:" << endl;
+        string line;
+        while (getline(userFile, line)) {
+            stringstream ss(line);
+            string username;
+            getline(ss, username, ',');
+            if (username != current_user) {
+                cout << username << endl;
+            }
+        }
+        userFile.close();
+        FollowUser(current_user); 
+    }
+    else {
+        SetColorAndBackground(12, 0);
+
+        cerr << "Error: Unable to open user credentials file!" << endl;
+        SetColorAndBackground(12, 0);
+
+    }
+}
+
+////construct the user graph from followed users file
+//void constructUserGraph(const string& username, FollowedUsers userGraph[]) {
+//    ifstream followedUsersStream(followedUsersFile);
+//    if (followedUsersStream.is_open()) {
+//        string line;
+//        
+//        getline(followedUsersStream, line);
+//        while (getline(followedUsersStream, line)) {
+//            stringstream ss(line);
+//            string users;
+//            
+//            getline(ss, users, ',');
+//            string user1, user2;
+//            
+//            istringstream userStream(users);
+//            getline(userStream, user1, ',');
+//            getline(userStream, user2, ',');
+//            if (user1 == username) {
+//                
+//                for (int i = 0; i < MAX_USERS; ++i) {
+//                    if (userGraph[i].username == "" || userGraph[i].username == user2) {
+//                        userGraph[i].username = user2;
+//                        userGraph[i].addFollowedUser(user1);
+//                        break;
+//                    }
+//                }
+//            }
+//            else if (user2 == username) {
+//                
+//                for (int i = 0; i < MAX_USERS; ++i) {
+//                    if (userGraph[i].username == "" || userGraph[i].username == user1) {
+//                        userGraph[i].username = user1;
+//                        userGraph[i].addFollowedUser(user2);
+//                        break;
+//                    }
+//                }
+//            }
+//        }
+//        followedUsersStream.close();
+//    }
+//    else {
+//        cerr << "Error: Unable to open followed_users file!" << endl;
+//    }
+//}
+
+
+////adjacency list of the user graph
+//void displayAdjacencyList(const FollowedUsers userGraph[]) {
+//    cout << "User Network:" << endl;
+//    for (int i = 0; i < MAX_USERS; ++i) {
+//        if (userGraph[i].username != "") {
+//            cout << userGraph[i].username << " follows: ";
+//            for (int j = 0; j < MAX_USERS; ++j) {
+//               
+//                if (userGraph[i].followed[j] != "") {
+//                    cout << userGraph[i].followed[j] << " ";
+//                }
+//            }
+//            cout << endl;
+//        }
+//    }
+//}
+
+
+// Function to handle user login
+void LoginUser() {
+    string user_name, password;
+    
+
+    SetColorAndBackground(9, 0);
+    cout << "\n/////// Login User ////////"<<endl<<endl;
+     SetColorAndBackground(9, 0);
+     
+
+     SetColorAndBackground(8, 0);
+    cout << "Enter User Name: ";
+    cin >> user_name;
+    cin.ignore();
+    cout << "Enter Password: ";
+    cin >> password;
+     SetColorAndBackground(8, 0);
+    cin.ignore();
+
+    if (VerifyCredentials(user_name, password)) {
+     SetColorAndBackground(10, 0);
+        cout << "Login successful!" << endl;
+     SetColorAndBackground(10, 0);
+
+        /*FollowedUsers userGraph[MAX_USERS];
+        constructUserGraph(user_name, userGraph);*/
+
+        // SetColorAndBackground(10, 0);
+
+        while (true) {
+            int option = 0;
+            int index = 0;
+         SetColorAndBackground(9, 0);
+            cout << "\n\\\------- Menu after Login -------//" << endl<<endl;
+         SetColorAndBackground(9, 0);
+
+         SetColorAndBackground(11, 0);
+            cout << "1. New repository" << endl;
+            cout << "2. View repositories" << endl;
+            cout << "3. Delete repository" << endl;
+            cout << "4. Add new file to repository" << endl;
+            cout << "5. Delete file from repository" << endl;
+            cout << "6. Commit changes to a file" << endl;
+            cout << "7. View Profile" << endl;
+            cout << "8. Follow Other Users" << endl;
+            cout << "9. Display User Network" << endl; 
+            cout << "10. Logout" << endl;
+            cout << "Enter your choice: ";        
+            cin >> option;
+         SetColorAndBackground(11, 0);
+
+            string repositoryName;
+            string fileName;
+            switch (option) {
+            case 1:
+             SetColorAndBackground(7, 0);
+                cout << "\n/////// New repository ///////" << endl<<endl;
+             SetColorAndBackground(7, 0);
+
+                cout << "Enter the name for the new repository: ";
+                cin.ignore();
+                getline(cin, repositoryName);
+                //cin >> repositoryName;
+                
+                index = hashFunction(user_name);
+                while (userAccounts[index].username != "") {
+                    index = (index + 1) % MAX_USERS;
+                }
+                userAccounts[index].addRepository(repositoryName);
+                CreateRepositoryFolder(user_name, repositoryName);
+
+                break;
+
+
+            case 2:
+                SetColorAndBackground(6, 0);
+
+                cout << "\n///// View repositories //////" << endl<<endl;
+                SetColorAndBackground(7, 0);
+
+                DisplayRepositories(user_name);
+                break;
+            case 3:
+                SetColorAndBackground(6, 0);
+
+                cout << "\n///// Delete repository /////" << endl<<endl;
+                SetColorAndBackground(7, 0);
+
+                cout << "Enter the name of the repository to delete: ";
+                cin >> repositoryName;
+                DeleteRepository(user_name, repositoryName);
+               /* if (DeleteRepository) {
+                    SetColorAndBackground(10, 0);
+
+                    cout << "Repository deleted successfully! " << endl;
+                }
+                else {
+                    SetColorAndBackground(12, 0);
+
+                    cout << "Unable to delete Repository. " << endl;
+                }*/
+                break;
+            case 4:
+                SetColorAndBackground(6, 0);
+
+                cout << "\n///// Add new file to repository /////" << endl<<endl;
+                SetColorAndBackground(7, 0);
+
+                cout << "Enter the name of the repository to add a new file: ";
+                cin >> repositoryName;
+                AddNewFile(user_name, repositoryName);
+                break;
+            case 5:
+                SetColorAndBackground(6, 0);
+                cout << "\n////// Delete file from repository /////" << endl<<endl;
+                SetColorAndBackground(7, 0);
+
+                cout << "Enter the name of the repository to delete a file from: ";
+                cin >> repositoryName;
+                cout << "Enter the name of the file to delete: ";
+                cin >> fileName;
+                DeleteFileFromRepository(user_name, repositoryName, fileName);
+                if (DeleteFileFromRepository) {
+                    SetColorAndBackground(10, 0);
+
+                    cout << "File deleted successfully! " << endl;
+                }
+                else {
+                    SetColorAndBackground(12, 0);
+
+                    cout << "Unable to delete File. " << endl;
+                }
+                break;
+            case 6:
+                SetColorAndBackground(6, 0);
+
+                cout << "\n///// Commit ///// " << endl<<endl;
+                SetColorAndBackground(7, 0);
+
+                cout << "Enter the name of the repository to commit changes: ";
+                cin >> repositoryName;
+                CommitChanges(user_name, repositoryName);
+                break;
+            case 7:
+                SetColorAndBackground(6, 0);
+                cout << "\n///// Your Profile ///// " << endl << endl;
+                SetColorAndBackground(7, 0);
+
+                viewProfile(user_name); 
+                break;
+            case 8:
+                SetColorAndBackground(6, 0);
+                cout << "\n///// Displaying Users to Follow ///// " << endl << endl;
+                SetColorAndBackground(7, 0);
+
+                DisplayUsersToFollow(user_name);
+                break;
+            case 9:
+               // displayAdjacencyList(userGraph); 
+                break;
+            case 10:
+                return; 
+            default:
+              SetColorAndBackground(12, 0);
+                cout << "Invalid option! Please try again." << endl;
+              SetColorAndBackground(12, 0);
+            }
+        }
+    }
+    else {
+        SetColorAndBackground(12, 0);
+        cout << "Invalid username or password!" << endl;
+        SetColorAndBackground(12, 0);
+    }
+}
+
+// main menu
+void Github_Main_Menu() {
+    int option = 0;
+    while (true) {
+        SetColorAndBackground(13, 0);
+        cout << "/////////////////////////////" << endl;
+        cout << "////_______GITHUB_______/////" << endl;
+        cout << "/////////////////////////////" << endl;
+        cout << endl;
+
+        SetColorAndBackground(13, 0);
+        SetColorAndBackground(7, 0);
+        cout << "\n////// Menu ///////" << endl<<endl;
+        SetColorAndBackground(7, 0);
+
+        SetColorAndBackground(14, 0);
+        cout << "1. Register" << endl;
+        cout << "2. Login" << endl;
+        cout << "3. Exit Program" << endl;
+        cout << "Enter your choice: ";
+        cin >> option;
+        SetColorAndBackground(14, 0);
+
+
+         /*SetColorAndBackground(8, 0);
+         SetColorAndBackground(8, 0);*/
+
+        switch (option) {
+        case 1:
+         SetColorAndBackground(8, 0);
+            RegisterUser();
+         SetColorAndBackground(8, 0);
+            break;
+        case 2:
+            LoginUser();
+            break;
+        case 3:
+            SetColorAndBackground(10, 0);
+
+            cout << "Program Exited Successfully! " << endl;
+            SetColorAndBackground(10, 0);
+
+            return;
+        default:
+          SetColorAndBackground(12, 0);
+            cout << "Invalid option! Please try again." << endl;
+          SetColorAndBackground(12, 0);
+        }
+    }
+}
+
+int main() {
+
+    Github_Main_Menu();
+    
+    
+    system("pause");
+    return 0;
+
+}
+
+
+
