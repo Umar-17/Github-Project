@@ -20,9 +20,7 @@ void SetColorAndBackground(int ForgC, int BackC)
     return;
 }
 
-//SetColorAndBackground(10, 0);
-//cout << "Hello World";
-//SetColorAndBackground(15, 0);
+
 
 
 const string usersFile = "user_credentials.csv";
