@@ -31,6 +31,6 @@ Usage:
 Follow the menu prompts to perform various actions in the application.
 Provide valid inputs when prompted and ensure proper formatting for file names and commit messages.
 Contributors:
-[Umar Zahoor] (Your GitHub Profile)
+[Umar Zahoor]
 [Shahzaib]
 [Asaad Naveed]
