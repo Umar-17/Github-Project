@@ -1,3 +1,6 @@
+# GitData – C++ Version Control Simulator  
+**Command-line C++ application simulating basic version control and social features inspired by GitHub.**  
+
 # Github-Project
 Github Project Repository.
 --------------------
