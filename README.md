@@ -27,14 +27,16 @@ You can copy the code and run it in any compatible compiler.
    ```bash
    cd GitData_Project
 2.Compile the project:
-
+   ```bash
    g++ main.cpp GitData_Proj.cpp -o GitData
-
+   ```
 3.Run the program:
+   ```bash
+    ./GitData
+   ```
+---
 
-./GitData
-
-##Features
+## Features
 
 User Registration and Login
 Users can register with a username and password, then log in to access their account.
@@ -54,7 +56,9 @@ Provides a simple, intuitive, menu-based command-line interface.
 Error Handling
 Includes error handling for invalid inputs and file operations.
 
-##Dependencies
+---
+
+## Dependencies
 
 C++ compiler (e.g., g++)
 
@@ -62,12 +66,16 @@ C++17 or later
 
 Windows.h (required for Windows users)
 
-##Usage
+---
+
+## Usage
 
 Follow the menu prompts displayed in the terminal to perform various actions.
 Provide valid inputs when prompted and ensure proper formatting for file names and commit messages.
 
-##Contributors
+---
+
+## Contributors
 
 Umar Zahoor
 
